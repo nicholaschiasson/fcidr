@@ -106,19 +106,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          RAW_BINARY_NAME=fcidr
-          BINARY_NAME=${RAW_BINARY_NAME}
-          if [[ ${{ startsWith(matrix.platform, 'windows') }} == true ]]
-          then
-            BINARY_NAME=${BINARY_NAME}.exe
-          fi
           cargo build --release --verbose
-          cp target/release/${BINARY_NAME} ./
-          tar czf ${RAW_BINARY_NAME}-${{ runner.os }}-${{ runner.arch }}.tar.gz ${BINARY_NAME}
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v3.1.2
-        with:
-          path: '*.tar.gz'
 
   publish:
     if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)
@@ -146,5 +134,4 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v0.1.15
         with:
-          files: 'artifact/*.tar.gz'
           tag_name: ${{ needs.tag.outputs.version }}
