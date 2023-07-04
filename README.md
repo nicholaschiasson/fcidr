@@ -12,4 +12,4 @@ This data structure can be applied, for example, in configuring firewalls that
 expresses rules for both allow and deny.
 
 > **Note**
-> Currently, only IPv4 is supported. IPv6 support is tracked by #6.
+> Currently, only IPv4 is supported. IPv6 support is tracked by [#6](https://github.com/nicholaschiasson/fcidr/issues/6).
