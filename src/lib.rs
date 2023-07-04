@@ -4,7 +4,7 @@ use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 pub use cidr::Cidr;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub enum FcidrInclusion {
     #[default]
     Excluded,
@@ -12,7 +12,12 @@ pub enum FcidrInclusion {
     Subnets([Option<Rc<RefCell<Fcidr>>>; 2]),
 }
 
-#[derive(Clone, Debug, Default)]
+enum SetInclusionAction {
+    Exclude,
+    Include,
+}
+
+#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Fcidr {
     cidr: Cidr,
     inclusion: FcidrInclusion,
@@ -32,27 +37,46 @@ impl Fcidr {
         }
     }
 
-    pub fn exclude(&mut self, cidr: Cidr) -> Result<(), cidr::Error> {
+    fn set_cidr_inclusion(
+        &mut self,
+        cidr: Cidr,
+        inclusion: &SetInclusionAction,
+    ) -> Result<(), cidr::Error> {
+        let (fcidr_inclusion, inverse_fcidr_inclusion, inverse_inclusion, inclusion_str) =
+            match inclusion {
+                SetInclusionAction::Exclude => (
+                    FcidrInclusion::Excluded,
+                    FcidrInclusion::Included,
+                    SetInclusionAction::Include,
+                    "exclude",
+                ),
+                SetInclusionAction::Include => (
+                    FcidrInclusion::Included,
+                    FcidrInclusion::Excluded,
+                    SetInclusionAction::Exclude,
+                    "include",
+                ),
+            };
+
         if self.cidr == cidr {
-            self.inclusion = FcidrInclusion::Excluded;
+            self.inclusion = fcidr_inclusion;
             return Ok(());
         }
 
         if !self.cidr.contains(cidr)? {
             return Err(cidr::Error::CidrBoundsError(format!(
-                "cidr '{}' cannot exclude '{}' which it does not contain",
+                "cidr '{}' cannot {inclusion_str} '{}' which it does not contain",
                 self.cidr, cidr
             )));
         }
 
-        if let FcidrInclusion::Included = self.inclusion {
+        if self.inclusion == inverse_fcidr_inclusion {
             for cidr in self.cidr.split()? {
-                self.include(cidr)?;
+                self.set_cidr_inclusion(cidr, &inverse_inclusion)?;
             }
         }
 
-        if let FcidrInclusion::Subnets(_) = self.inclusion {
-        } else {
+        if !matches!(self.inclusion, FcidrInclusion::Subnets(_)) {
             self.inclusion = FcidrInclusion::Subnets([None, None]);
         }
 
@@ -82,62 +106,16 @@ impl Fcidr {
             }
         };
 
-        let res = (*subnet).borrow_mut().exclude(cidr);
+        let res = (*subnet).borrow_mut().set_cidr_inclusion(cidr, inclusion);
         res
     }
 
+    pub fn exclude(&mut self, cidr: Cidr) -> Result<(), cidr::Error> {
+        self.set_cidr_inclusion(cidr, &SetInclusionAction::Exclude)
+    }
+
     pub fn include(&mut self, cidr: Cidr) -> Result<(), cidr::Error> {
-        if self.cidr == cidr {
-            self.inclusion = FcidrInclusion::Included;
-            return Ok(());
-        }
-
-        if !self.cidr.contains(cidr)? {
-            return Err(cidr::Error::CidrBoundsError(format!(
-                "cidr '{}' cannot include '{}' which it does not contain",
-                self.cidr, cidr
-            )));
-        }
-
-        if let FcidrInclusion::Excluded = self.inclusion {
-            for cidr in self.cidr.split()? {
-                self.exclude(cidr)?;
-            }
-        }
-
-        if let FcidrInclusion::Subnets(_) = self.inclusion {
-        } else {
-            self.inclusion = FcidrInclusion::Subnets([None, None]);
-        }
-
-        let prefix = self.cidr.prefix() + 1;
-
-        if prefix as u32 > u32::BITS {
-            return Err(cidr::Error::PrefixRangeError(format!(
-                "network prefix '{}' must be 32 or less",
-                cidr.prefix()
-            )));
-        }
-
-        let index = ((u32::from(cidr.network()) >> (u32::BITS - prefix as u32)) & 1) as usize;
-
-        let subnet = match (index & 1, &mut self.inclusion) {
-            (0, FcidrInclusion::Subnets([Some(subnet), _]))
-            | (1, FcidrInclusion::Subnets([_, Some(subnet)])) => subnet.clone(),
-            (_, FcidrInclusion::Subnets(subnets)) => {
-                let subnet = Rc::new(RefCell::new(Fcidr::new_subnet(self.cidr.split()?[index])));
-                subnets[index] = Some(subnet.clone());
-                subnet
-            }
-            (_, inclusion) => {
-                return Err(cidr::Error::ImpossibleError(format!(
-                    "inclusion state is '{inclusion:?}'"
-                )))
-            }
-        };
-
-        let res = (*subnet).borrow_mut().include(cidr);
-        res
+        self.set_cidr_inclusion(cidr, &SetInclusionAction::Include)
     }
 
     pub fn iter(&self) -> FcidrIntoIterator {
@@ -196,7 +174,7 @@ impl TryFrom<Cidr> for Fcidr {
     type Error = cidr::Error;
 
     fn try_from(value: Cidr) -> Result<Self, Self::Error> {
-        todo!()
+        Self::new(value)
     }
 }
 
