@@ -12,18 +12,18 @@ pub struct Cidr {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Error {
-    CidrBoundsError(String),
-    InvalidNetworkError(String),
-    PrefixRangeError(String),
-    ParseError(String),
-    TypeCastError(String),
-    ImpossibleError(String),
+    CidrNotInRange(String),
+    InvalidNetwork(String),
+    InvalidPrefix(String),
+    Parse(String),
+    TypeCast(String),
+    Impossible(String),
 }
 
 impl Cidr {
     pub fn new(network: Ipv4Addr, prefix: u8) -> Result<Self, Error> {
         if prefix as u32 > u32::BITS {
-            return Err(Error::PrefixRangeError(format!(
+            return Err(Error::InvalidPrefix(format!(
                 "network prefix '{prefix}' must be 32 or less"
             )));
         }
@@ -37,7 +37,7 @@ impl Cidr {
                 (if i > 0 { o } else { o << offset >> offset }) != 0
             })
         {
-            return Err(Error::InvalidNetworkError(format!(
+            return Err(Error::InvalidNetwork(format!(
                 "network address '{network}' must be clear after the first {prefix} bits"
             )));
         }
@@ -67,12 +67,12 @@ impl Cidr {
     pub fn last(&self) -> Ipv4Addr {
         let mut last = self.network.octets();
         let first_octet: usize = (self.prefix() / 8).into();
-        for i in first_octet..last.len() {
-            if i > first_octet {
-                last[i] = u8::MAX
+        for (i, o) in last.iter_mut().skip(first_octet).enumerate() {
+            if i > 0 {
+                *o = u8::MAX
             } else {
                 let offset = self.prefix % 8;
-                last[i] |= u8::MAX << offset >> offset;
+                *o |= u8::MAX << offset >> offset;
             }
         }
         Ipv4Addr::from(last)
@@ -82,9 +82,9 @@ impl Cidr {
     where
         T: Copy + Debug + TryInto<Cidr>,
     {
-        let cidr: Cidr = net.try_into().map_err(|_| {
-            Error::TypeCastError(format!("could not cast value '{:?}' to cidr", net))
-        })?;
+        let cidr: Cidr = net
+            .try_into()
+            .map_err(|_| Error::TypeCast(format!("could not cast value '{:?}' to cidr", net)))?;
         Ok(cidr.first() >= self.first() && cidr.last() <= self.last())
     }
 
@@ -128,15 +128,13 @@ impl FromStr for Cidr {
             Self::new(
                 network
                     .parse::<Ipv4Addr>()
-                    .map_err(|e| Error::ParseError(e.to_string()))?,
+                    .map_err(|e| Error::Parse(e.to_string()))?,
                 prefix
                     .parse::<u8>()
-                    .map_err(|e| Error::ParseError(e.to_string()))?,
+                    .map_err(|e| Error::Parse(e.to_string()))?,
             )
         } else {
-            Err(Error::ParseError(
-                "missing network prefix delimiter".to_owned(),
-            ))
+            Err(Error::Parse("missing network prefix delimiter".to_owned()))
         }
     }
 }

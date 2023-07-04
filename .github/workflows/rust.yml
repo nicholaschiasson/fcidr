@@ -1,0 +1,150 @@
+name: Rust
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.5.2
+      - name: Check
+        run: cargo check --verbose
+      - name: Format
+        run: cargo fmt --check --verbose
+      - name: Lint
+        run: rustup component add clippy && cargo clippy --verbose
+      - name: Test
+        run: cargo test --verbose
+
+  tag:
+    if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    needs: [validate]
+    outputs:
+      version: ${{ steps.stamp.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.5.2
+      - name: Check semver bump
+        id: check-semver
+        run: |
+          if [[ "${{ github.event.head_commit.message }}" =~ ^Merge\ pull\ request\ #[0-9]+\ from\ [^/]+/patch/.+$ ]]
+          then
+            echo "semver=patch" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.head_commit.message }}" =~ ^Merge\ pull\ request\ #[0-9]+\ from\ [^/]+/major/.+$ ]]
+          then
+            echo "semver=major" >> $GITHUB_OUTPUT
+          else
+            echo "semver=minor" >> $GITHUB_OUTPUT
+          fi
+      - name: Bump major version and push tag
+        id: bump-major
+        if: ${{ steps.check-semver.outputs.semver == 'major' }}
+        uses: anothrNick/github-tag-action@1.65.0
+        env:
+          DEFAULT_BUMP: major
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bump minor version and push tag
+        id: bump-minor
+        if: ${{ steps.check-semver.outputs.semver == 'minor' }}
+        uses: anothrNick/github-tag-action@1.65.0
+        env:
+          DEFAULT_BUMP: minor
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bump patch version and push tag
+        id: bump-patch
+        if: ${{ steps.check-semver.outputs.semver == 'patch' }}
+        uses: anothrNick/github-tag-action@1.65.0
+        env:
+          DEFAULT_BUMP: patch
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Stamp version
+        id: stamp
+        run: |
+          if [[ "${{ steps.check-semver.outputs.semver }}" == patch ]]
+          then
+            VERSION=${{ steps.bump-patch.outputs.new_tag }}
+          elif [[ "${{ steps.check-semver.outputs.semver }}" == major ]]
+          then
+            VERSION=${{ steps.bump-major.outputs.new_tag }}
+          else
+            VERSION=${{ steps.bump-minor.outputs.new_tag }}
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          sed -i "s/version = \"0.0.0\"/version = \"${VERSION}\"/" Cargo.toml
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3.1.2
+        with:
+          name: 'Cargo.toml'
+          path: 'Cargo.toml'
+
+  build:
+    if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)
+    strategy:
+      matrix:
+        platform: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    needs: [tag]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.5.2
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3.0.2
+        with:
+          name: 'Cargo.toml'
+      - name: Build
+        shell: bash
+        run: |
+          RAW_BINARY_NAME=fcidr
+          BINARY_NAME=${RAW_BINARY_NAME}
+          if [[ ${{ startsWith(matrix.platform, 'windows') }} == true ]]
+          then
+            BINARY_NAME=${BINARY_NAME}.exe
+          fi
+          cargo build --release --verbose
+          cp target/release/${BINARY_NAME} ./
+          tar czf ${RAW_BINARY_NAME}-${{ runner.os }}-${{ runner.arch }}.tar.gz ${BINARY_NAME}
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3.1.2
+        with:
+          path: '*.tar.gz'
+
+  publish:
+    if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    needs: [tag]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.5.2
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3.0.2
+        with:
+          name: 'Cargo.toml'
+      - name: Publish to crates.io
+        run: |
+          cargo login ${{ secrets.CRATES_IO_API_TOKEN }}
+          cargo publish --allow-dirty --verbose
+
+  release:
+    if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    needs: [tag, build]
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3.0.2
+      - name: Release
+        uses: softprops/action-gh-release@v0.1.15
+        with:
+          files: 'artifact/*.tar.gz'
+          tag_name: ${{ needs.tag.outputs.version }}

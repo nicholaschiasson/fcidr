@@ -1,8 +1,23 @@
 [package]
 name = "fcidr"
-version = "0.1.0"
+version = "0.0.0"
+authors = ["Nicholas Omer Chiasson <nicholasomerchiasson@gmail.com>"]
 edition = "2021"
+license = "MIT"
+description = """
+Fragmented Classless Inter-Domain Routing (FCIDR)
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+A library exposing a data structure to represent a set of CIDR ranges and
+easily manipulate its entries using set-like operations.
+"""
+readme = "README.md"
+homepage = "https://github.com/nicholaschiasson/fcidr"
+repository = "https://github.com/nicholaschiasson/fcidr"
+keywords = ["network", "ip", "ipv4", "cidr"]
+categories = ["data-structures", "network-programming"]
+
+[badges]
+github = { repository = "nicholaschiasson/fcidr" }
+maintenance = { status = "passively-maintained" }
 
 [dependencies]
