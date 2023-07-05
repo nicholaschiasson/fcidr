@@ -139,15 +139,6 @@ impl Fcidr {
     }
 }
 
-impl Display for Fcidr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for cidr in self.into_iter() {
-            writeln!(f, "{cidr}")?;
-        }
-        Ok(())
-    }
-}
-
 impl IntoIterator for Fcidr {
     type Item = Cidr;
 
@@ -226,9 +217,9 @@ mod tests {
             .exclude("255.255.255.255/32".parse().unwrap())
             .unwrap();
         // fcidr.include("0.0.0.0/0".parse().unwrap()).unwrap();
-        println!("{fcidr}");
+        // println!("{fcidr}");
         // println!("{:?}", fcidr.iter().collect::<Vec<_>>());
-        println!("{fcidr:?}");
+        // println!("{fcidr:?}");
         // fcidr.exclude("10.0.0.1/32".parse().unwrap());
         // for i in 0..=32 {
         //     println!("{} {}", i / 8, i % 8);

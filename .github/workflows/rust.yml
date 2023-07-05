@@ -19,13 +19,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3.5.2
       - name: Check
-        run: cargo check --verbose
+        run: cargo check --all-features --verbose
       - name: Format
         run: cargo fmt --check --verbose
       - name: Lint
         run: rustup component add clippy && cargo clippy --verbose
       - name: Test
-        run: cargo test --verbose
+        run: cargo test --all-features --verbose
 
   tag:
     if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)
@@ -106,7 +106,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          cargo build --release --verbose
+          cargo build --all-features --release --verbose
 
   publish:
     if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)

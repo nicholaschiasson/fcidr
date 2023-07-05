@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Cidr {
     network: Ipv4Addr,
     prefix: u8,
@@ -18,6 +18,12 @@ pub enum Error {
     Parse(String),
     TypeCast(String),
     Impossible(String),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 impl Cidr {
