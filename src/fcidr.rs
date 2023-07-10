@@ -248,7 +248,11 @@ impl Iterator for FcidrIntoIterator {
 
 //     #[test]
 //     fn it_works() {
-//         // let mut fcidr = Fcidr::default();
+//         let mut fcidr = Fcidr::default();
+//         fcidr.union("10.0.0.0/8".parse().unwrap());
+//         fcidr.union("10.0.128.0/24".parse().unwrap());
+//         fcidr.difference("10.0.80.0/20".parse().unwrap());
+//         fcidr.union("10.0.82.0/24".parse().unwrap());
 //         // fcidr.union("10.0.0.0/24".parse().unwrap());
 //         // fcidr.union("10.0.128.0/25".parse().unwrap());
 //         // fcidr.union("11.0.0.0/8".parse().unwrap());
@@ -262,9 +266,9 @@ impl Iterator for FcidrIntoIterator {
 //         // fcidr.union("0.0.0.0/0".parse().unwrap());
 //         // fcidr.difference("10.0.0.1/32".parse().unwrap());
 //         // println!("{:?}", fcidr.iter().collect::<Vec<_>>());
-//         // for cidr in &fcidr {
-//         //     println!("{cidr}");
-//         // }
-//         // println!("{fcidr:?}");
+//         for cidr in &fcidr {
+//             println!("{cidr}");
+//         }
+//         println!("{fcidr:?}");
 //     }
 // }
