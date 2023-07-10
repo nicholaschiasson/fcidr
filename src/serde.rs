@@ -57,7 +57,7 @@ impl<'de> Visitor<'de> for FcidrVisitor {
     {
         let mut value = Self::Value::default();
         while let Some(element) = seq.next_element()? {
-            value.include(element).map_err(serde::de::Error::custom)?;
+            value.union(element);
         }
         Ok(value)
     }
@@ -97,8 +97,8 @@ mod tests {
             "{}",
             serde_json::json!("128.0.0.0/30".parse::<Cidr>().unwrap())
         );
-        let mut fcidr = Fcidr::new("10.0.0.0/8".parse().unwrap()).unwrap();
-        fcidr.exclude("10.128.128.127/32".parse().unwrap()).unwrap();
+        let mut fcidr = Fcidr::new("10.0.0.0/8".parse().unwrap());
+        fcidr.difference("10.128.128.127/32".parse().unwrap());
         println!("{}", serde_json::json!(fcidr));
         let fcidr: Fcidr = serde_json::from_str("[\"10.0.0.0/9\",\"10.128.0.0/17\",\"10.128.128.0/26\",\"10.128.128.64/27\",\"10.128.128.96/28\",\"10.128.128.112/29\",\"10.128.128.120/30\",\"10.128.128.124/31\",\"10.128.128.126/32\",\"10.128.128.128/25\",\"10.128.129.0/24\",\"10.128.130.0/23\",\"10.128.132.0/22\",\"10.128.136.0/21\",\"10.128.144.0/20\",\"10.128.160.0/19\",\"10.128.192.0/18\",\"10.129.0.0/16\",\"10.130.0.0/15\",\"10.132.0.0/14\",\"10.136.0.0/13\",\"10.144.0.0/12\",\"10.160.0.0/11\",\"10.192.0.0/10\"]").unwrap();
         for (i, cidr) in fcidr.iter().enumerate() {

@@ -4,26 +4,12 @@ use std::{
     str::FromStr,
 };
 
+use crate::Error;
+
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Cidr {
     network: Ipv4Addr,
     prefix: u8,
-}
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Error {
-    CidrNotInRange(String),
-    InvalidNetwork(String),
-    InvalidPrefix(String),
-    Parse(String),
-    TypeCast(String),
-    Impossible(String),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
 }
 
 impl Cidr {
@@ -84,22 +70,58 @@ impl Cidr {
         Ipv4Addr::from(last)
     }
 
-    pub fn contains<T>(&self, net: T) -> Result<bool, Error>
+    pub fn contains<T>(&self, net: T) -> bool
     where
-        T: Copy + Debug + TryInto<Cidr>,
+        T: Copy + Debug + Into<Cidr>,
     {
-        let cidr: Cidr = net
-            .try_into()
-            .map_err(|_| Error::TypeCast(format!("could not cast value '{:?}' to cidr", net)))?;
-        Ok(cidr.first() >= self.first() && cidr.last() <= self.last())
+        let cidr: Cidr = net.into();
+        cidr.first() >= self.first() && cidr.last() <= self.last()
     }
 
-    pub fn split(&self) -> Result<[Cidr; 2], Error> {
-        let prefix = self.prefix + 1;
-        Ok([
-            Self::new(self.network, prefix)?,
-            Self::new(self.mid(), prefix)?,
-        ])
+    pub fn parent(&self) -> Option<Cidr> {
+        match self.prefix {
+            0 => None,
+            1 => Some(Self::default()),
+            _ => {
+                let prefix = self.prefix - 1;
+                let shift = u32::BITS - prefix as u32;
+                Some(Self {
+                    network: (u32::from(self.network) >> shift << shift).into(),
+                    prefix,
+                })
+            }
+        }
+    }
+
+    pub fn left_subnet(&self) -> Option<Cidr> {
+        match self.prefix as u32 {
+            u32::BITS => None,
+            _ => Some(Self {
+                network: self.network,
+                prefix: self.prefix + 1,
+            }),
+        }
+    }
+
+    pub fn right_subnet(&self) -> Option<Cidr> {
+        match self.prefix as u32 {
+            u32::BITS => None,
+            _ => {
+                let prefix = self.prefix + 1;
+                let shift = u32::BITS - prefix as u32;
+                Some(Self {
+                    network: (((u32::from(self.network) >> shift) | 1) << shift).into(),
+                    prefix: prefix,
+                })
+            }
+        }
+    }
+
+    pub fn split(&self) -> Option<[Cidr; 2]> {
+        match (self.left_subnet(), self.right_subnet()) {
+            (Some(left), Some(right)) => Some([left, right]),
+            _ => None,
+        }
     }
 }
 
@@ -140,46 +162,70 @@ impl FromStr for Cidr {
                     .map_err(|e| Error::Parse(e.to_string()))?,
             )
         } else {
-            Err(Error::Parse("missing network prefix delimiter".to_owned()))
+            Err(Error::Parse("missing network prefix delimiter".to_string()))
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    // #[test]
-    // fn cidr_constructor() {
-    //     for prefix in 0..=32 {
-    //         println!("{}", Cidr::new(Ipv4Addr::new(0b10000000, 0, 0, 0), prefix).unwrap());
-    //         println!("{}", Cidr::new(Ipv4Addr::new(0xFF, 0xFF, 0xFF, 0xFF), prefix).unwrap());
-    //     }
-    // }
+//     // #[test]
+//     // fn does_it_work() {
+//     //     let cidr = Cidr::default();
+//     //     println!("{cidr}");
+//     //     println!("{:?}", cidr.parent());
+//     //     println!("{:?}\n", cidr.split());
+//     //     let cidr: Cidr = "0.0.0.0/0".parse().unwrap();
+//     //     println!("{cidr}");
+//     //     println!("{:?}", cidr.parent());
+//     //     println!("{:?}\n", cidr.split());
+//     //     let cidr: Cidr = "48.0.0.0/4".parse().unwrap();
+//     //     println!("{cidr}");
+//     //     println!("{:?}", cidr.parent());
+//     //     println!("{:?}\n", cidr.split());
+//     //     let cidr: Cidr = "10.0.128.0/25".parse().unwrap();
+//     //     println!("{cidr}");
+//     //     println!("{:?}", cidr.parent());
+//     //     println!("{:?}\n", cidr.split());
+//     //     let cidr: Cidr = "255.255.255.255/32".parse().unwrap();
+//     //     println!("{cidr}");
+//     //     println!("{:?}", cidr.parent());
+//     //     println!("{:?}", cidr.split());
+//     // }
 
-    // #[test]
-    // fn cidr_first() {
-    //     let cidr: Cidr = "10.0.0.0/8".parse().unwrap();
-    //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-    //     let cidr: Cidr = "10.0.0.0/9".parse().unwrap();
-    //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-    //     let cidr: Cidr = "10.128.0.0/9".parse().unwrap();
-    //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-    //     let cidr: Cidr = "10.128.0.0/8".parse().unwrap();
-    //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-    // }
+//     // #[test]
+//     // fn cidr_constructor() {
+//     //     for prefix in 0..=32 {
+//     //         println!("{}", Cidr::new(Ipv4Addr::new(0b10000000, 0, 0, 0), prefix).unwrap());
+//     //         println!("{}", Cidr::new(Ipv4Addr::new(0xFF, 0xFF, 0xFF, 0xFF), prefix).unwrap());
+//     //     }
+//     // }
 
-    #[test]
-    fn it_works() {
-        // let c: Cidr = "10.0.0.0/8".parse().unwrap();
-        // let [l, r] = c.split().unwrap();
-        // println!("{l}, {r}");
-        // for i in 0..=32 {
-        //     println!("{} {}", i / 8, i % 8);
-        // }
-        // let o = 127_u8;
-        // println!("{}", o == o >> 1 << 1);
-        // println!("{}", "127.0.343.0".parse::<Ipv4Addr>().unwrap());
-        // println!("{}", "127.0.343.0".parse::<Cidr>().unwrap());
-    }
-}
+//     // #[test]
+//     // fn cidr_first() {
+//     //     let cidr: Cidr = "10.0.0.0/8".parse().unwrap();
+//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
+//     //     let cidr: Cidr = "10.0.0.0/9".parse().unwrap();
+//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
+//     //     let cidr: Cidr = "10.128.0.0/9".parse().unwrap();
+//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
+//     //     let cidr: Cidr = "10.128.0.0/8".parse().unwrap();
+//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
+//     // }
+
+//     // #[test]
+//     // fn it_works() {
+//     //     let c: Cidr = "10.0.0.0/8".parse().unwrap();
+//     //     let [l, r] = c.split().unwrap();
+//     //     println!("{l}, {r}");
+//     //     for i in 0..=32 {
+//     //         println!("{} {}", i / 8, i % 8);
+//     //     }
+//     //     let o = 127_u8;
+//     //     println!("{}", o == o >> 1 << 1);
+//     //     println!("{}", "127.0.343.0".parse::<Ipv4Addr>().unwrap());
+//     //     println!("{}", "127.0.343.0".parse::<Cidr>().unwrap());
+//     // }
+// }
