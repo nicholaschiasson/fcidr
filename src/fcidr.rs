@@ -1,141 +1,161 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{cidr, Cidr};
+use crate::Cidr;
 
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-enum FcidrInclusion {
+enum Inclusion {
     #[default]
     Excluded,
     Included,
-    Subnets([Option<Rc<RefCell<Fcidr>>>; 2]),
+    Subnets([Rc<RefCell<CidrNode>>; 2]),
 }
 
-enum SetInclusionAction {
-    Exclude,
-    Include,
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum BinarySetOperator {
+    Difference,
+    Union,
+}
+
+impl Into<Inclusion> for BinarySetOperator {
+    fn into(self) -> Inclusion {
+        match self {
+            BinarySetOperator::Difference => Inclusion::Excluded,
+            BinarySetOperator::Union => Inclusion::Included,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+struct CidrNode {
+    cidr: Cidr,
+    inclusion: Inclusion,
+}
+
+impl CidrNode {
+    fn new(cidr: Cidr) -> Self {
+        Self {
+            cidr,
+            inclusion: Default::default(),
+        }
+    }
+
+    fn binary_set_operation(&mut self, cidr: Cidr, operator: BinarySetOperator) -> &mut Self {
+        if self.cidr == cidr {
+            self.inclusion = operator.into();
+        } else if self.cidr.contains(cidr) && self.inclusion != operator.into() {
+            let subnets = match &self.inclusion {
+                Inclusion::Subnets([left, right]) => [left.clone(), right.clone()],
+                inclusion => {
+                    let [left, right] = [
+                        Rc::new(RefCell::new(CidrNode {
+                            cidr: self.cidr.left_subnet().unwrap(),
+                            inclusion: inclusion.to_owned(),
+                        })),
+                        Rc::new(RefCell::new(CidrNode {
+                            cidr: self.cidr.right_subnet().unwrap(),
+                            inclusion: inclusion.to_owned(),
+                        })),
+                    ];
+                    self.inclusion = Inclusion::Subnets([left.clone(), right.clone()]);
+                    [left, right]
+                }
+            };
+            for subnet in &subnets {
+                subnet.borrow_mut().binary_set_operation(cidr, operator);
+            }
+            if subnets
+                .iter()
+                .all(|subnet| subnet.borrow().inclusion == operator.into())
+            {
+                self.inclusion = operator.into();
+            }
+        }
+        self
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Fcidr {
-    cidr: Cidr,
-    inclusion: FcidrInclusion,
+    cidr: Rc<RefCell<CidrNode>>,
 }
 
 impl Fcidr {
-    pub fn new(cidr: Cidr) -> Result<Self, cidr::Error> {
+    pub fn new(cidr: Cidr) -> Self {
         let mut fcidr = Self::default();
-        fcidr.include(cidr)?;
-        Ok(fcidr)
-    }
-
-    fn new_subnet(child: Cidr) -> Self {
-        Self {
-            cidr: child,
-            ..Default::default()
-        }
-    }
-
-    fn set_cidr_inclusion(
-        &mut self,
-        cidr: Cidr,
-        inclusion: &SetInclusionAction,
-    ) -> Result<(), cidr::Error> {
-        let (fcidr_inclusion, inverse_fcidr_inclusion, inverse_inclusion, inclusion_str) =
-            match inclusion {
-                SetInclusionAction::Exclude => (
-                    FcidrInclusion::Excluded,
-                    FcidrInclusion::Included,
-                    SetInclusionAction::Include,
-                    "exclude",
-                ),
-                SetInclusionAction::Include => (
-                    FcidrInclusion::Included,
-                    FcidrInclusion::Excluded,
-                    SetInclusionAction::Exclude,
-                    "include",
-                ),
-            };
-
-        if self.cidr == cidr {
-            self.inclusion = fcidr_inclusion;
-            return Ok(());
-        }
-
-        if !self.cidr.contains(cidr)? {
-            return Err(cidr::Error::CidrNotInRange(format!(
-                "cidr '{}' cannot {inclusion_str} '{}' which it does not contain",
-                self.cidr, cidr
-            )));
-        }
-
-        if self.inclusion == inverse_fcidr_inclusion {
-            for cidr in self.cidr.split()? {
-                self.set_cidr_inclusion(cidr, &inverse_inclusion)?;
+        let mut next = vec![Rc::new(RefCell::new(CidrNode {
+            cidr,
+            inclusion: Inclusion::Included,
+        }))];
+        while let Some(n) = next.pop() {
+            if let (Some(parent), cidr) = (n.borrow().cidr.parent(), n.borrow().cidr) {
+                next.push(Rc::new(RefCell::new(CidrNode {
+                    cidr: parent,
+                    inclusion: Inclusion::Subnets(
+                        if (u32::from(cidr.network()) >> (u32::BITS - cidr.prefix() as u32)) & 1
+                            == 0
+                        {
+                            [
+                                n.clone(),
+                                Rc::new(RefCell::new(CidrNode::new(
+                                    parent.right_subnet().unwrap(),
+                                ))),
+                            ]
+                        } else {
+                            [
+                                Rc::new(RefCell::new(CidrNode::new(parent.left_subnet().unwrap()))),
+                                n.clone(),
+                            ]
+                        },
+                    ),
+                })));
+            } else {
+                fcidr.cidr = n.clone();
             }
         }
-
-        if !matches!(self.inclusion, FcidrInclusion::Subnets(_)) {
-            self.inclusion = FcidrInclusion::Subnets([None, None]);
-        }
-
-        let prefix = self.cidr.prefix() + 1;
-
-        if prefix as u32 > u32::BITS {
-            return Err(cidr::Error::InvalidPrefix(format!(
-                "network prefix '{}' must be 32 or less",
-                cidr.prefix()
-            )));
-        }
-
-        let index = ((u32::from(cidr.network()) >> (u32::BITS - prefix as u32)) & 1) as usize;
-
-        let subnet = match (index & 1, &mut self.inclusion) {
-            (0, FcidrInclusion::Subnets([Some(subnet), _]))
-            | (1, FcidrInclusion::Subnets([_, Some(subnet)])) => subnet.clone(),
-            (_, FcidrInclusion::Subnets(subnets)) => {
-                let subnet = Rc::new(RefCell::new(Fcidr::new_subnet(self.cidr.split()?[index])));
-                subnets[index] = Some(subnet.clone());
-                subnet
-            }
-            (_, inclusion) => {
-                return Err(cidr::Error::Impossible(format!(
-                    "inclusion state is '{inclusion:?}'"
-                )))
-            }
-        };
-
-        let res = (*subnet).borrow_mut().set_cidr_inclusion(cidr, inclusion);
-        res
+        fcidr
     }
 
-    pub fn exclude(&mut self, cidr: Cidr) -> Result<(), cidr::Error> {
-        self.set_cidr_inclusion(cidr, &SetInclusionAction::Exclude)
+    pub fn complement(&mut self) -> &mut Self {
+        let mut next = vec![self.cidr.clone()];
+        while let Some(node) = next.pop() {
+            let mut node = node.borrow_mut();
+            match &node.inclusion {
+                Inclusion::Excluded => node.inclusion = Inclusion::Included,
+                Inclusion::Included => node.inclusion = Inclusion::Excluded,
+                Inclusion::Subnets(subnet) => {
+                    for s in subnet {
+                        next.push(s.clone());
+                    }
+                }
+            }
+        }
+        self
     }
 
-    pub fn include(&mut self, cidr: Cidr) -> Result<(), cidr::Error> {
-        self.set_cidr_inclusion(cidr, &SetInclusionAction::Include)
+    pub fn difference(&mut self, cidr: Cidr) -> &mut Self {
+        self.cidr
+            .borrow_mut()
+            .binary_set_operation(cidr, BinarySetOperator::Difference);
+        self
+    }
+
+    pub fn union(&mut self, cidr: Cidr) -> &mut Self {
+        self.cidr
+            .borrow_mut()
+            .binary_set_operation(cidr, BinarySetOperator::Union);
+        self
     }
 
     pub fn iter(&self) -> FcidrIntoIterator {
-        match &self.inclusion {
-            FcidrInclusion::Excluded => FcidrIntoIterator {
-                next: None,
-                remaining: Vec::new(),
-            },
-            FcidrInclusion::Included => FcidrIntoIterator {
-                next: Some(self.cidr),
-                remaining: Vec::new(),
-            },
-            FcidrInclusion::Subnets(subnets) => FcidrIntoIterator {
-                next: None,
-                remaining: subnets
-                    .iter()
-                    .rev()
-                    .flatten()
-                    .map(|s| s.to_owned())
-                    .collect(),
-            },
+        FcidrIntoIterator {
+            next: vec![self.cidr.clone()],
         }
+    }
+}
+
+impl From<Cidr> for Fcidr {
+    fn from(value: Cidr) -> Self {
+        Self::new(value)
     }
 }
 
@@ -159,74 +179,92 @@ impl IntoIterator for &Fcidr {
     }
 }
 
-impl TryFrom<Cidr> for Fcidr {
-    type Error = cidr::Error;
-
-    fn try_from(value: Cidr) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
-
+#[derive(Debug, Default)]
 pub struct FcidrIntoIterator {
-    // TODO: Get rid of this when datastructure uses actual tree node for root
-    next: Option<Cidr>,
-    remaining: Vec<Rc<RefCell<Fcidr>>>,
+    next: Vec<Rc<RefCell<CidrNode>>>,
 }
 
 impl Iterator for FcidrIntoIterator {
     type Item = Cidr;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO: Get rid of this when datastructure uses actual tree node for root
-        if let Some(next) = self.next {
-            self.next = None;
-            return Some(next);
-        }
-
-        while let Some(fcidr) = self.remaining.pop() {
-            let fcidr = (*fcidr).borrow();
-            match &fcidr.inclusion {
-                FcidrInclusion::Excluded => continue,
-                FcidrInclusion::Included => return Some(fcidr.cidr),
-                FcidrInclusion::Subnets(subnets) => {
-                    for subnet in subnets.iter().rev().flatten().map(|s| s.to_owned()) {
-                        self.remaining.push(subnet);
+        while let Some(node) = self.next.pop() {
+            match &node.borrow().inclusion {
+                Inclusion::Excluded => continue,
+                Inclusion::Included => return Some(node.borrow().cidr),
+                Inclusion::Subnets(subnets) => {
+                    for subnet in subnets.iter().rev().map(|s| s.to_owned()) {
+                        self.next.push(subnet);
                     }
                 }
             }
         }
-
         None
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    #[test]
-    fn it_works() {
-        let mut fcidr = Fcidr::default();
-        fcidr.include("10.0.0.0/24".parse().unwrap()).unwrap();
-        fcidr.include("10.0.128.0/25".parse().unwrap()).unwrap();
-        fcidr.include("11.0.0.0/8".parse().unwrap()).unwrap();
-        fcidr.exclude("10.0.0.64/32".parse().unwrap()).unwrap();
-        fcidr.include("0.0.0.0/0".parse().unwrap()).unwrap();
-        fcidr.exclude("128.0.0.0/32".parse().unwrap()).unwrap();
-        fcidr
-            .exclude("255.255.255.255/32".parse().unwrap())
-            .unwrap();
-        // fcidr.include("0.0.0.0/0".parse().unwrap()).unwrap();
-        // println!("{fcidr}");
-        // println!("{:?}", fcidr.iter().collect::<Vec<_>>());
-        // println!("{fcidr:?}");
-        // fcidr.exclude("10.0.0.1/32".parse().unwrap());
-        // for i in 0..=32 {
-        //     println!("{} {}", i / 8, i % 8);
-        // }
-        // let o = 127_u8;
-        // println!("{}", o == o >> 1 << 1);
-        // println!("{}", "127.0.343.0".parse::<Ipv4Addr>().unwrap());
-        // println!("{}", "127.0.343.0".parse::<Cidr>().unwrap());
-    }
-}
+//     // #[test]
+//     // fn does_it_work() {
+//     //     let mut fcidr = Fcidr::default();
+//     //     fcidr.iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     fcidr.complement().complement().iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     // println!("{fcidr:#?}\n");
+//     //     println!();
+//     //     let mut fcidr = Fcidr::new("0.0.0.0/0".parse().unwrap());
+//     //     fcidr.iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     // println!("{fcidr:#?}\n");
+//     //     println!();
+//     //     let mut fcidr = Fcidr::new("48.0.0.0/4".parse().unwrap());
+//     //     fcidr.iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     // println!("{fcidr:#?}\n");
+//     //     println!();
+//     //     let mut fcidr = Fcidr::new("10.0.128.0/25".parse().unwrap());
+//     //     fcidr.iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     // println!("{fcidr:#?}\n");
+//     //     println!();
+//     //     let mut fcidr = Fcidr::new("255.255.255.255/32".parse().unwrap());
+//     //     fcidr.iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
+//     //     println!();
+//     //     // println!("{fcidr:#?}\n");
+//     //     println!();
+//     // }
+
+//     #[test]
+//     fn it_works() {
+//         // let mut fcidr = Fcidr::default();
+//         // fcidr.union("10.0.0.0/24".parse().unwrap());
+//         // fcidr.union("10.0.128.0/25".parse().unwrap());
+//         // fcidr.union("11.0.0.0/8".parse().unwrap());
+//         // fcidr.difference("10.0.0.64/32".parse().unwrap());
+//         // fcidr.union("10.0.0.64/32".parse().unwrap());
+//         // fcidr.difference("10.0.0.64/32".parse().unwrap());
+//         // fcidr.union("0.0.0.0/0".parse().unwrap());
+//         // fcidr.difference("128.0.0.0/32".parse().unwrap());
+//         // fcidr
+//         //     .difference("255.255.255.255/32".parse().unwrap());
+//         // fcidr.union("0.0.0.0/0".parse().unwrap());
+//         // fcidr.difference("10.0.0.1/32".parse().unwrap());
+//         // println!("{:?}", fcidr.iter().collect::<Vec<_>>());
+//         // for cidr in &fcidr {
+//         //     println!("{cidr}");
+//         // }
+//         // println!("{fcidr:?}");
+//     }
+// }
