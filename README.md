@@ -36,9 +36,9 @@ Fragmented Classless Inter-Domain Routing (FCIDR)
 Usage: fcidr [CIDR] <COMMAND>
 
 Commands:
-  complement  Compute the complement of the input CIDR(s)
-  difference  Compute the set difference between the input CIDR(s) and another CIDR [aliases: exclude, minus]
-  union       Compute the set union of the input CIDR(s) and another CIDR [aliases: include, plus]
+  complement  Compute the complement of the input CIDR(s) [aliases: !, not]
+  difference  Compute the set difference between the input CIDR(s) and another CIDR [aliases: -, exclude, minus]
+  union       Compute the set union of the input CIDR(s) and another CIDR [aliases: +, include, plus]
   help        Print this message or the help of the given subcommand(s)
 
 Arguments:
@@ -46,7 +46,7 @@ Arguments:
 
 Options:
   -h, --help     Print help
-  -V, --version  Print version
+  -V, --version  Print version`
 ```
 
 ### Example
@@ -88,5 +88,33 @@ fcidr 10.0.0.0/8 difference 10.0.64.0/20 | fcidr difference 10.0.82.0/24 | fcidr
 16.0.0.0/4
 32.0.0.0/3
 64.0.0.0/2
+128.0.0.0/1
+```
+
+Alternative concise syntax:
+
+```
+fcidr 10.0.0.0/8 + 127.0.0.0/16 | fcidr - 10.64.0.0/16 | fcidr !
+0.0.0.0/5
+8.0.0.0/7
+10.64.0.0/16
+11.0.0.0/8
+12.0.0.0/6
+16.0.0.0/4
+32.0.0.0/3
+64.0.0.0/3
+96.0.0.0/4
+112.0.0.0/5
+120.0.0.0/6
+124.0.0.0/7
+126.0.0.0/8
+127.1.0.0/16
+127.2.0.0/15
+127.4.0.0/14
+127.8.0.0/13
+127.16.0.0/12
+127.32.0.0/11
+127.64.0.0/10
+127.128.0.0/9
 128.0.0.0/1
 ```

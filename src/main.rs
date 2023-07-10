@@ -20,14 +20,19 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum FcidrCommand {
     /// Compute the complement of the input CIDR(s)
+    #[command(visible_alias = "!", visible_alias = "not")]
     Complement,
     /// Compute the set difference between the input CIDR(s) and another CIDR
-    #[command(visible_alias = "exclude", visible_alias = "minus")]
+    #[command(
+        visible_alias = "-",
+        visible_alias = "exclude",
+        visible_alias = "minus"
+    )]
     Difference {
         /// The second CIDR range operand for the difference function
         cidr: Cidr,
     },
-    #[command(visible_alias = "include", visible_alias = "plus")]
+    #[command(visible_alias = "+", visible_alias = "include", visible_alias = "plus")]
     /// Compute the set union of the input CIDR(s) and another CIDR
     Union {
         /// The second CIDR range operand for the union function
