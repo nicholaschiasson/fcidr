@@ -119,14 +119,14 @@ fcidr 10.0.0.0/8 + 127.0.0.0/16 | fcidr - 10.64.0.0/16 | fcidr !
 128.0.0.0/1
 ```
 
-### Development
+## Development
 
-#### Prerequisites
+### Prerequisites
 
 - [nix](https://nixos.org/download.html)
 - [nix flakes](https://nixos.wiki/wiki/Flakes#Enable_flakes)
 
-#### How-to
+### How-to
 
 Create the development shell environment. Necessary to run all other commands.
 
@@ -190,9 +190,9 @@ For example: run the application with a flag to report the version.
 just run -- --version
 ```
 
-##### Tips and Recommendations
+#### Tips and Recommendations
 
-###### Open IDE from Development Shell
+##### Open IDE from Development Shell
 
 To get linking to rust binaries in your IDE, you should open the development shell from your terminal and then open your IDE
 from that shell session. This will carry over the development shell's environment into your IDE.
