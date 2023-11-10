@@ -38,6 +38,7 @@ Usage: fcidr [CIDR] <COMMAND>
 Commands:
   complement  Compute the complement of the input CIDR(s) [aliases: !, not]
   difference  Compute the set difference between the input CIDR(s) and another CIDR [aliases: -, exclude, minus]
+  superset    Exits successfully if the input CIDR(s) is a superset of another CIDR [aliases: >, contains]
   union       Compute the set union of the input CIDR(s) and another CIDR [aliases: +, include, plus]
   help        Print this message or the help of the given subcommand(s)
 
@@ -117,6 +118,16 @@ fcidr 10.0.0.0/8 + 127.0.0.0/16 | fcidr - 10.64.0.0/16 | fcidr !
 127.64.0.0/10
 127.128.0.0/9
 128.0.0.0/1
+```
+
+```
+fcidr 255.0.0.0/16 contains "255.0.1.2/32" && echo Woohoo!
+Woohoo!
+```
+
+```
+echo 255.0.0.0/16 | fcidr contains "255.1.1.2/32" && echo Woohoo!
+Error: "not a superset of 255.1.1.2/32"
 ```
 
 ## Development
