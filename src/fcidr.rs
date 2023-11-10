@@ -72,6 +72,23 @@ impl CidrNode {
         }
         self
     }
+
+    fn contains(&self, cidr: Cidr) -> bool {
+        if cidr.prefix() < self.cidr.prefix() {
+            return false;
+        }
+        match &self.inclusion {
+            Inclusion::Excluded => false,
+            Inclusion::Included => self.cidr.contains(cidr),
+            Inclusion::Subnets([left, right]) => {
+                if cidr.network() < self.cidr.mid() {
+                    left.borrow().contains(cidr)
+                } else {
+                    right.borrow().contains(cidr)
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
@@ -137,6 +154,10 @@ impl Fcidr {
             .borrow_mut()
             .binary_set_operation(cidr, BinarySetOperator::Difference);
         self
+    }
+
+    pub fn is_superset(&self, cidr: Cidr) -> bool {
+        self.cidr.borrow().contains(cidr)
     }
 
     pub fn union(&mut self, cidr: Cidr) -> &mut Self {

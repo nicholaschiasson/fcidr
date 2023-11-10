@@ -140,13 +140,19 @@ impl Display for Cidr {
     }
 }
 
-impl TryFrom<Ipv4Addr> for Cidr {
-    type Error = Error;
-
-    fn try_from(value: Ipv4Addr) -> Result<Self, Self::Error> {
-        Self::new(value, u32::BITS as u8)
+impl From<Ipv4Addr> for Cidr {
+    fn from(value: Ipv4Addr) -> Self {
+        Self::new(value, u32::BITS as u8).expect("convert from Ipv4Addr")
     }
 }
+
+// impl TryFrom<Ipv4Addr> for Cidr {
+//     type Error = Error;
+
+//     fn try_from(value: Ipv4Addr) -> Result<Self, Self::Error> {
+//         Self::new(value, u32::BITS as u8)
+//     }
+// }
 
 impl FromStr for Cidr {
     type Err = Error;

@@ -32,8 +32,11 @@ enum FcidrCommand {
         /// The second CIDR range operand for the difference function
         cidr: Cidr,
     },
-    #[command(visible_alias = "+", visible_alias = "include", visible_alias = "plus")]
+    /// Exits successfully if the input CIDR(s) is a superset of another CIDR
+    #[command(visible_alias = ">", visible_alias = "contains")]
+    Superset { cidr: Cidr },
     /// Compute the set union of the input CIDR(s) and another CIDR
+    #[command(visible_alias = "+", visible_alias = "include", visible_alias = "plus")]
     Union {
         /// The second CIDR range operand for the union function
         cidr: Cidr,
@@ -65,6 +68,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     match cli.command {
         FcidrCommand::Complement => fcidr.complement(),
         FcidrCommand::Difference { cidr } => fcidr.difference(cidr),
+        FcidrCommand::Superset { cidr } => {
+            if fcidr.is_superset(cidr) {
+                return Ok(());
+            }
+            return Err(format!("not a superset of {cidr}").into());
+        }
         FcidrCommand::Union { cidr } => fcidr.union(cidr),
     };
 
