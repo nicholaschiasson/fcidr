@@ -50,7 +50,9 @@ Options:
   -V, --version  Print version`
 ```
 
-### Example
+### Examples
+
+#### Computing a specific set of CIDRs within 10.0.0.0/8, excluding some subranges, and including a subrange of one that was excluded
 
 ```
 fcidr 10.0.0.0/8 difference 10.0.64.0/20 | fcidr difference 10.0.82.0/24 | fcidr union 10.0.82.74/31
@@ -72,6 +74,8 @@ fcidr 10.0.0.0/8 difference 10.0.64.0/20 | fcidr difference 10.0.82.0/24 | fcidr
 10.128.0.0/9
 ```
 
+#### Inverting the previous result
+
 ```
 fcidr 10.0.0.0/8 difference 10.0.64.0/20 | fcidr difference 10.0.82.0/24 | fcidr union 10.0.82.74/31 | fcidr complement
 0.0.0.0/5
@@ -92,7 +96,9 @@ fcidr 10.0.0.0/8 difference 10.0.64.0/20 | fcidr difference 10.0.82.0/24 | fcidr
 128.0.0.0/1
 ```
 
-Alternative concise syntax:
+#### Alternative concise syntax
+
+Note these symbols may not play nice with your shell, so you can quote them if you want, for example `fcidr "!"`).
 
 ```
 fcidr 10.0.0.0/8 + 127.0.0.0/16 | fcidr - 10.64.0.0/16 | fcidr !
@@ -120,6 +126,8 @@ fcidr 10.0.0.0/8 + 127.0.0.0/16 | fcidr - 10.64.0.0/16 | fcidr !
 128.0.0.0/1
 ```
 
+#### Check if an IP is within a CIDR
+
 ```
 fcidr 255.0.0.0/16 contains "255.0.1.2/32" && echo Woohoo!
 Woohoo!
@@ -128,6 +136,20 @@ Woohoo!
 ```
 echo 255.0.0.0/16 | fcidr contains "255.1.1.2/32" && echo Woohoo!
 Error: "not a superset of 255.1.1.2/32"
+```
+
+#### Check if a CIDR is within any of a large set of CIDRs
+
+Expanding upon the previous example, thanks to Amazon publishing a JSON formatted list of their public IP ranges, we can check if an IP or CIDR effectively is owned by Amazon. As long as we can get the list of ranges separated by new lines, piping that to `fcidr` makes the task trivial.
+
+```
+curl -s https://ip-ranges.amazonaws.com/ip-ranges.json | jq -r '.prefixes[].ip_prefix' | fcidr contains 52.43.76.84/30 && echo "This CIDR is within an Amazon range."
+This CIDR is within an Amazon range.
+```
+
+```
+curl -s https://ip-ranges.amazonaws.com/ip-ranges.json | jq -r '.prefixes[].ip_prefix' | fcidr contains 62.43.76.0/24 && echo "This CIDR is within an Amazon range."
+Error: "not a superset of 62.43.76.0/24"
 ```
 
 ## Development
