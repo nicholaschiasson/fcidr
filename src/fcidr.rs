@@ -16,9 +16,9 @@ enum BinarySetOperator {
     Union,
 }
 
-impl Into<Inclusion> for BinarySetOperator {
-    fn into(self) -> Inclusion {
-        match self {
+impl From<BinarySetOperator> for Inclusion {
+    fn from(val: BinarySetOperator) -> Self {
+        match val {
             BinarySetOperator::Difference => Inclusion::Excluded,
             BinarySetOperator::Union => Inclusion::Included,
         }
@@ -224,72 +224,52 @@ impl Iterator for FcidrIntoIterator {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     // #[test]
-//     // fn does_it_work() {
-//     //     let mut fcidr = Fcidr::default();
-//     //     fcidr.iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     fcidr.complement().complement().iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     // println!("{fcidr:#?}\n");
-//     //     println!();
-//     //     let mut fcidr = Fcidr::new("0.0.0.0/0".parse().unwrap());
-//     //     fcidr.iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     // println!("{fcidr:#?}\n");
-//     //     println!();
-//     //     let mut fcidr = Fcidr::new("48.0.0.0/4".parse().unwrap());
-//     //     fcidr.iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     // println!("{fcidr:#?}\n");
-//     //     println!();
-//     //     let mut fcidr = Fcidr::new("10.0.128.0/25".parse().unwrap());
-//     //     fcidr.iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     // println!("{fcidr:#?}\n");
-//     //     println!();
-//     //     let mut fcidr = Fcidr::new("255.255.255.255/32".parse().unwrap());
-//     //     fcidr.iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     fcidr.complement().iter().for_each(|c| println!("{c}"));
-//     //     println!();
-//     //     // println!("{fcidr:#?}\n");
-//     //     println!();
-//     // }
+    #[test]
+    fn default_is_empty() {
+        let f = Fcidr::default();
+        assert_eq!(f.iter().count(), 0);
+    }
 
-//     #[test]
-//     fn it_works() {
-//         let mut fcidr = Fcidr::default();
-//         fcidr.union("10.0.0.0/8".parse().unwrap());
-//         fcidr.union("10.0.128.0/24".parse().unwrap());
-//         fcidr.difference("10.0.80.0/20".parse().unwrap());
-//         fcidr.union("10.0.82.0/24".parse().unwrap());
-//         // fcidr.union("10.0.0.0/24".parse().unwrap());
-//         // fcidr.union("10.0.128.0/25".parse().unwrap());
-//         // fcidr.union("11.0.0.0/8".parse().unwrap());
-//         // fcidr.difference("10.0.0.64/32".parse().unwrap());
-//         // fcidr.union("10.0.0.64/32".parse().unwrap());
-//         // fcidr.difference("10.0.0.64/32".parse().unwrap());
-//         // fcidr.union("0.0.0.0/0".parse().unwrap());
-//         // fcidr.difference("128.0.0.0/32".parse().unwrap());
-//         // fcidr
-//         //     .difference("255.255.255.255/32".parse().unwrap());
-//         // fcidr.union("0.0.0.0/0".parse().unwrap());
-//         // fcidr.difference("10.0.0.1/32".parse().unwrap());
-//         // println!("{:?}", fcidr.iter().collect::<Vec<_>>());
-//         for cidr in &fcidr {
-//             println!("{cidr}");
-//         }
-//         println!("{fcidr:?}");
-//     }
-// }
+    #[test]
+    fn union_then_iter_single_range() {
+        let mut f = Fcidr::default();
+        f.union("10.0.0.0/8".parse().unwrap());
+        let items: Vec<_> = f.iter().collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].to_string(), "10.0.0.0/8");
+    }
+
+    #[test]
+    fn difference_splits_range() {
+        // Removing left half of /8 yields only the right /9
+        let mut f = Fcidr::default();
+        f.union("10.0.0.0/8".parse().unwrap())
+            .difference("10.0.0.0/9".parse().unwrap());
+        let items: Vec<_> = f.iter().collect();
+        assert_eq!(items, vec!["10.128.0.0/9".parse::<Cidr>().unwrap()]);
+        assert!(f.is_superset("10.128.0.0/9".parse().unwrap()));
+        assert!(!f.is_superset("10.0.0.0/9".parse().unwrap()));
+    }
+
+    #[test]
+    fn complement_toggles_all() {
+        let mut f = Fcidr::default();
+        f.complement();
+        let items: Vec<_> = f.iter().collect();
+        assert_eq!(items, vec!["0.0.0.0/0".parse::<Cidr>().unwrap()]);
+        f.complement();
+        assert_eq!(f.iter().count(), 0);
+    }
+
+    #[test]
+    fn superset_checks() {
+        let mut f = Fcidr::default();
+        f.union("10.0.0.0/8".parse().unwrap());
+        assert!(f.is_superset("10.0.80.0/20".parse().unwrap()));
+        assert!(!f.is_superset("11.0.0.0/8".parse().unwrap()));
+    }
+}

@@ -111,7 +111,7 @@ impl Cidr {
                 let shift = u32::BITS - prefix as u32;
                 Some(Self {
                     network: (((u32::from(self.network) >> shift) | 1) << shift).into(),
-                    prefix: prefix,
+                    prefix,
                 })
             }
         }
@@ -173,65 +173,49 @@ impl FromStr for Cidr {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     // #[test]
-//     // fn does_it_work() {
-//     //     let cidr = Cidr::default();
-//     //     println!("{cidr}");
-//     //     println!("{:?}", cidr.parent());
-//     //     println!("{:?}\n", cidr.split());
-//     //     let cidr: Cidr = "0.0.0.0/0".parse().unwrap();
-//     //     println!("{cidr}");
-//     //     println!("{:?}", cidr.parent());
-//     //     println!("{:?}\n", cidr.split());
-//     //     let cidr: Cidr = "48.0.0.0/4".parse().unwrap();
-//     //     println!("{cidr}");
-//     //     println!("{:?}", cidr.parent());
-//     //     println!("{:?}\n", cidr.split());
-//     //     let cidr: Cidr = "10.0.128.0/25".parse().unwrap();
-//     //     println!("{cidr}");
-//     //     println!("{:?}", cidr.parent());
-//     //     println!("{:?}\n", cidr.split());
-//     //     let cidr: Cidr = "255.255.255.255/32".parse().unwrap();
-//     //     println!("{cidr}");
-//     //     println!("{:?}", cidr.parent());
-//     //     println!("{:?}", cidr.split());
-//     // }
+    #[test]
+    fn invalid_prefix_rejected() {
+        let err = Cidr::new(Ipv4Addr::new(0, 0, 0, 0), 33).unwrap_err();
+        matches!(err, Error::InvalidPrefix(_));
+    }
 
-//     // #[test]
-//     // fn cidr_constructor() {
-//     //     for prefix in 0..=32 {
-//     //         println!("{}", Cidr::new(Ipv4Addr::new(0b10000000, 0, 0, 0), prefix).unwrap());
-//     //         println!("{}", Cidr::new(Ipv4Addr::new(0xFF, 0xFF, 0xFF, 0xFF), prefix).unwrap());
-//     //     }
-//     // }
+    #[test]
+    fn invalid_network_bits_rejected() {
+        // host bits present for /8 must be zero
+        let err = Cidr::new(Ipv4Addr::new(10, 0, 0, 1), 8).unwrap_err();
+        matches!(err, Error::InvalidNetwork(_));
+    }
 
-//     // #[test]
-//     // fn cidr_first() {
-//     //     let cidr: Cidr = "10.0.0.0/8".parse().unwrap();
-//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-//     //     let cidr: Cidr = "10.0.0.0/9".parse().unwrap();
-//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-//     //     let cidr: Cidr = "10.128.0.0/9".parse().unwrap();
-//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-//     //     let cidr: Cidr = "10.128.0.0/8".parse().unwrap();
-//     //     println!("{} / {} : {} -> {}", cidr.network(), cidr.prefix(), cidr.first(), cidr.last());
-//     // }
+    #[test]
+    fn boundaries_and_midpoint() {
+        let cidr: Cidr = "10.0.0.0/8".parse().unwrap();
+        assert_eq!(cidr.first(), Ipv4Addr::new(10, 0, 0, 0));
+        assert_eq!(cidr.mid(), Ipv4Addr::new(10, 128, 0, 0));
+        assert_eq!(cidr.last(), Ipv4Addr::new(10, 255, 255, 255));
+    }
 
-//     // #[test]
-//     // fn it_works() {
-//     //     let c: Cidr = "10.0.0.0/8".parse().unwrap();
-//     //     let [l, r] = c.split().unwrap();
-//     //     println!("{l}, {r}");
-//     //     for i in 0..=32 {
-//     //         println!("{} {}", i / 8, i % 8);
-//     //     }
-//     //     let o = 127_u8;
-//     //     println!("{}", o == o >> 1 << 1);
-//     //     println!("{}", "127.0.343.0".parse::<Ipv4Addr>().unwrap());
-//     //     println!("{}", "127.0.343.0".parse::<Cidr>().unwrap());
-//     // }
-// }
+    #[test]
+    fn parent_and_subnets() {
+        let cidr: Cidr = "10.0.0.0/8".parse().unwrap();
+        let left = cidr.left_subnet().unwrap();
+        let right = cidr.right_subnet().unwrap();
+        assert_eq!(left.to_string(), "10.0.0.0/9");
+        assert_eq!(right.to_string(), "10.128.0.0/9");
+
+        let parent = left.parent().unwrap();
+        assert_eq!(parent.to_string(), "10.0.0.0/8");
+        assert!(Cidr::default().parent().is_none()); // /0 has no parent
+    }
+
+    #[test]
+    fn contains_checks() {
+        let cidr: Cidr = "10.0.0.0/8".parse().unwrap();
+        assert!(cidr.contains("10.80.0.0/16".parse::<Cidr>().unwrap()));
+        assert!(cidr.contains(Ipv4Addr::new(10, 0, 0, 1))); // /32 derived from IP
+        assert!(!cidr.contains("11.0.0.0/8".parse::<Cidr>().unwrap()));
+    }
+}

@@ -156,15 +156,14 @@ Error: "not a superset of 62.43.76.0/24"
 
 ### Prerequisites
 
-- [nix](https://nixos.org/download.html)
-- [nix flakes](https://nixos.wiki/wiki/Flakes#Enable_flakes)
+- [mise](https://mise.jdx.dev/)
 
 ### How-to
 
-Create the development shell environment. Necessary to run all other commands.
+Install tooling. Necessary to run all other commands.
 
 ```shell
-nix develop
+mise install
 ```
 
 Build with cargo.

@@ -1,0 +1,4 @@
+[tools]
+"cargo:cargo-watch" = "8.5.3"
+just = "1.46.0"
+rust = "1.90.0"

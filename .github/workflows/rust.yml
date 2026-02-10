@@ -4,7 +4,17 @@ on:
   push:
     branches:
       - 'main'
+    paths:
+      - '**.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
   pull_request:
+    paths:
+      - '**.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v6
       - name: Check
         run: cargo check --all-features --verbose
       - name: Format
@@ -35,7 +45,7 @@ jobs:
       version: ${{ steps.stamp.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v6
       - name: Check semver bump
         id: check-semver
         run: |
@@ -51,21 +61,21 @@ jobs:
       - name: Bump major version and push tag
         id: bump-major
         if: ${{ steps.check-semver.outputs.semver == 'major' }}
-        uses: anothrNick/github-tag-action@1.65.0
+        uses: anothrNick/github-tag-action@1.75.0
         env:
           DEFAULT_BUMP: major
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bump minor version and push tag
         id: bump-minor
         if: ${{ steps.check-semver.outputs.semver == 'minor' }}
-        uses: anothrNick/github-tag-action@1.65.0
+        uses: anothrNick/github-tag-action@1.75.0
         env:
           DEFAULT_BUMP: minor
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bump patch version and push tag
         id: bump-patch
         if: ${{ steps.check-semver.outputs.semver == 'patch' }}
-        uses: anothrNick/github-tag-action@1.65.0
+        uses: anothrNick/github-tag-action@1.75.0
         env:
           DEFAULT_BUMP: patch
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,7 +94,7 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           sed -i "s/version = \"0.0.0\"/version = \"${VERSION}\"/" Cargo.toml
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v6
         with:
           name: 'Cargo.toml'
           path: 'Cargo.toml'
@@ -98,9 +108,9 @@ jobs:
     needs: [tag]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v6
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v3.0.2
+        uses: actions/download-artifact@v7
         with:
           name: 'Cargo.toml'
       - name: Build
@@ -116,7 +126,7 @@ jobs:
           cp target/release/${BINARY_NAME} ./
           tar czf ${RAW_BINARY_NAME}-${{ runner.os }}-${{ runner.arch }}.tar.gz ${BINARY_NAME}
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v6
         with:
           path: '*.tar.gz'
 
@@ -126,9 +136,9 @@ jobs:
     needs: [tag]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v6
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v3.0.2
+        uses: actions/download-artifact@v7
         with:
           name: 'Cargo.toml'
       - name: Publish to crates.io
@@ -142,9 +152,9 @@ jobs:
     needs: [tag, build]
     steps:
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v3.0.2
+        uses: actions/download-artifact@v7
       - name: Release
-        uses: softprops/action-gh-release@v0.1.15
+        uses: softprops/action-gh-release@v2.5.0
         with:
           files: 'artifact/*.tar.gz'
           tag_name: ${{ needs.tag.outputs.version }}
