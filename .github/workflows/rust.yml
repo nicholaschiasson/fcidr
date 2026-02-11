@@ -8,11 +8,13 @@ on:
       - '**.rs'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - '.github/workflows/rust.yml'
   pull_request:
     paths:
       - '**.rs'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - '.github/workflows/rust.yml'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
