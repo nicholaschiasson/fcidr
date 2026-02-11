@@ -156,5 +156,5 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2.5.0
         with:
-          files: 'artifact/*.tar.gz'
+          files: 'artifact*/*.tar.gz'
           tag_name: ${{ needs.tag.outputs.version }}
