@@ -1,4 +1,5 @@
-use std::{cell::RefCell, rc::Rc};
+use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
+use core::cell::RefCell;
 
 use crate::Cidr;
 

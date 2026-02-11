@@ -1,7 +1,7 @@
 #![cfg(feature = "serde")]
 #![cfg_attr(doc_cfg, doc(cfg(feature = "serde")))]
 
-use std::str::FromStr;
+use core::str::FromStr;
 
 use serde::{de::Visitor, ser::SerializeSeq, Deserialize, Serialize};
 

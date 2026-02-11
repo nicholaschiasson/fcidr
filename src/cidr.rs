@@ -1,4 +1,7 @@
-use std::{
+extern crate alloc;
+
+use alloc::{format, string::ToString};
+use core::{
     fmt::{Debug, Display},
     net::Ipv4Addr,
     str::FromStr,
@@ -135,7 +138,7 @@ impl Default for Cidr {
 }
 
 impl Display for Cidr {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{}/{}", self.network, self.prefix)
     }
 }

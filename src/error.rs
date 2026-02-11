@@ -1,4 +1,5 @@
-use std::{error, fmt};
+use alloc::string::String;
+use core::{error, fmt::Display};
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Error {
@@ -7,8 +8,8 @@ pub enum Error {
     Parse(String),
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self:?}")
     }
 }

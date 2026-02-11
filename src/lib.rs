@@ -1,3 +1,5 @@
+extern crate alloc;
+
 mod cidr;
 mod error;
 mod fcidr;
