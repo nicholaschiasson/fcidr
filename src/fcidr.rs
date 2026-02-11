@@ -1,4 +1,7 @@
-use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
+#[allow(unused_imports)]
+use alloc::string::ToString;
+
+use alloc::{borrow::ToOwned, rc::Rc, vec, vec::Vec};
 use core::cell::RefCell;
 
 use crate::Cidr;
