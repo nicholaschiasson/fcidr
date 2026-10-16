@@ -1,0 +1,26 @@
+[package]
+name = "fcidr-cli"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "fcidr"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.3", features = ["derive"] }
+fcidr = { path = "..", features = ["serde"] }
+
+[dev-dependencies]
+serde_json = "1.0"
+assert_cmd = "2.0"
+predicates = "3.0"
