@@ -6,15 +6,17 @@ on:
       - 'main'
     paths:
       - '**.rs'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
       - '.github/workflows/rust.yml'
+      - '**/README.md'
   pull_request:
     paths:
       - '**.rs'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
       - '.github/workflows/rust.yml'
+      - '**/README.md'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
