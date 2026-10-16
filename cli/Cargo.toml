@@ -8,8 +8,8 @@ description.workspace = true
 readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
-keywords.workspace = true
-categories.workspace = true
+keywords = ["network", "ip", "ipv4", "cidr", "cli"]
+categories = ["command-line-utilities", "data-structures", "network-programming"]
 rust-version.workspace = true
 
 [[bin]]
