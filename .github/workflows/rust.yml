@@ -104,7 +104,7 @@ jobs:
       - name: Upload Cli Package Manifest
         uses: actions/upload-artifact@v6
         with:
-          name: 'cli/Cargo.toml'
+          name: 'cli_Cargo.toml'
           path: 'cli/Cargo.toml'
 
   build:
@@ -124,7 +124,7 @@ jobs:
       - name: Download Cli Package Manifest
         uses: actions/download-artifact@v7
         with:
-          name: 'cli/Cargo.toml'
+          name: 'cli_Cargo.toml'
       - name: Build
         shell: bash
         run: |
@@ -157,7 +157,7 @@ jobs:
       - name: Download Cli Package Manifest
         uses: actions/download-artifact@v7
         with:
-          name: 'cli/Cargo.toml'
+          name: 'cli_Cargo.toml'
       - name: Publish to crates.io
         run: |
           cargo login ${{ secrets.CRATES_IO_API_TOKEN }}
