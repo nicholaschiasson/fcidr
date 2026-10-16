@@ -12,8 +12,8 @@ description = """Fragmented Classless Inter-Domain Routing (FCIDR)"""
 readme = "README.md"
 homepage = "https://github.com/nicholaschiasson/fcidr"
 repository = "https://github.com/nicholaschiasson/fcidr"
-keywords = ["network", "ip", "ipv4", "cidr", "cli"]
-categories = ["command-line-utilities", "data-structures", "network-programming"]
+keywords = ["network", "ip", "ipv4", "cidr"]
+categories = ["data-structures", "network-programming"]
 rust-version = "1.85.0"
 
 [package]
