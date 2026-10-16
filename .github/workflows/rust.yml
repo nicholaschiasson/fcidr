@@ -96,16 +96,11 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           sed -i "s/version = \"0.0.0\"/version = \"${VERSION}\"/" Cargo.toml
           sed -i "s/^\(fcidr = .*\) }/\1, version = \"${VERSION}\" }/" cli/Cargo.toml
-      - name: Upload Root Package Manifest
+      - name: Upload Package Manifests
         uses: actions/upload-artifact@v6
         with:
           name: 'Cargo.toml'
-          path: 'Cargo.toml'
-      - name: Upload Cli Package Manifest
-        uses: actions/upload-artifact@v6
-        with:
-          name: 'cli_Cargo.toml'
-          path: 'cli/Cargo.toml'
+          path: '**/Cargo.toml'
 
   build:
     if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.merged == true)
@@ -117,14 +112,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Download Root Package Manifest
+      - name: Download Package Manifests
         uses: actions/download-artifact@v7
         with:
           name: 'Cargo.toml'
-      - name: Download Cli Package Manifest
-        uses: actions/download-artifact@v7
-        with:
-          name: 'cli_Cargo.toml'
       - name: Build
         shell: bash
         run: |
@@ -150,14 +141,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Download Root Package Manifest
+      - name: Download Package Manifests
         uses: actions/download-artifact@v7
         with:
           name: 'Cargo.toml'
-      - name: Download Cli Package Manifest
-        uses: actions/download-artifact@v7
-        with:
-          name: 'cli_Cargo.toml'
       - name: Publish to crates.io
         run: |
           cargo login ${{ secrets.CRATES_IO_API_TOKEN }}
