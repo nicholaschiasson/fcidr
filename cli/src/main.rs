@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    io::{stdin, IsTerminal},
+    io::{IsTerminal, stdin},
 };
 
 use clap::{CommandFactory, Parser, Subcommand};
@@ -53,16 +53,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             Cli::command().print_help().unwrap();
             ::std::process::exit(2);
         }
-        stdin().lines().fold(
-            Ok(Fcidr::default()),
-            |fcidr: Result<Fcidr, Box<dyn Error>>, l| {
-                if let Ok(mut fcidr) = fcidr {
-                    fcidr.union(l?.parse()?);
-                    return Ok(fcidr);
-                }
-                fcidr
-            },
-        )?
+        let fcidr: Result<Fcidr, Box<dyn Error>> =
+            stdin().lines().try_fold(Fcidr::default(), |mut fcidr, l| {
+                Ok(fcidr.union(l?.parse()?).to_owned())
+            });
+        fcidr?
     };
 
     match cli.command {

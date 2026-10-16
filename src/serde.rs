@@ -1,10 +1,10 @@
 #![cfg(feature = "serde")]
-#![cfg_attr(doc_cfg, doc(cfg(feature = "serde")))]
+#![cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 
 use alloc::string::ToString;
 use core::str::FromStr;
 
-use serde::{de::Visitor, ser::SerializeSeq, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Visitor, ser::SerializeSeq};
 
 use crate::{Cidr, Fcidr};
 
